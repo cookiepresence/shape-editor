@@ -16,6 +16,7 @@ from PyQt5.QtCore import Qt
 
 Format = Enum('Format', ['XML', 'DRW'])
 
+SHAPES = []
 
 class Corner(Enum):
     Rounded = 'r'
@@ -50,7 +51,7 @@ class Colour:
     def xml (self):
         return NotImplementedError()
 
-
+    
 @dataclass
 class Line:
     start: Point
@@ -89,6 +90,9 @@ class DrawingArea(QGraphicsView):
         self.drawing_line = None
         self.drawing_rect = None  # Initialize drawing_rect to None
 
+    def group_objects (self):
+        raise NotImplementedError()
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -96,45 +100,37 @@ class MainWindow(QMainWindow):
         self.drawing_area = DrawingArea()
         self.setCentralWidget(self.drawing_area)
 
-        self._create_actions()
-        self._create_menus()
-        self._create_toolbars()
+        self.toolbar = self.addToolBar("Drawing")
 
-    def _create_actions(self):
-        """Creates actions to be attached to menus"""
-        self.open_action = QAction("&Open", self)
-        self.open_action.triggered.connect(self.open_file)
-        self.save_action = QAction("&Save", self)
-        self.save_action.triggered.connect(self.save_file)
-        self.line_action = QAction("&Line", self)
-        self.line_action.triggered.connect(
-            lambda: self.drawing_area.set_drawing_object("line")
-        )
-        self.rect_action = QAction("&Rectangle", self)
-        self.rect_action.triggered.connect(
-            lambda: self.drawing_area.set_drawing_object("rect")
-        )
-        self.group_action = QAction("&Group", self)
-        self.group_action.triggered.connect(self.drawing_area.group_objects)
+        # TODO: Can be redone with Named Tuples/Dataclasses?
+        self.menu = [
+            ("&File", [
+                ("&Open", self.open_file, True),
+                ("&Save", self.save_file, True)
+            ]),
+            ("&Draw", [
+                ("&Line", lambda: self.drawing_area.set_drawing_object(Line), True),
+                ("&Rect", lambda: self.drawing_area.set_drawing_object(Rectangle), True)
+            ]),
+            ("&Edit", [
+                ("&Group", self.drawing_area.group_objects, False)
+            ])
+        ]
 
-    def _create_menus(self):
-        """Creates menus to be displayed in the menu bar of the program"""
-        file_menu = self.menuBar().addMenu("&File")
-        file_menu.addAction(self.open_action)
-        file_menu.addAction(self.save_action)
-        draw_menu = self.menuBar().addMenu("&Draw")
-        draw_menu.addAction(self.line_action)
-        draw_menu.addAction(self.rect_action)
-        edit_menu = self.menuBar().addMenu("&Edit")
-        edit_menu.addAction(self.group_action)
+        self._create_menubar()
 
-    def _create_toolbars(self):
-        toolbar = self.addToolBar("Drawing")
-        toolbar.addAction(self.open_action)
-        toolbar.addAction(self.save_action)
-        toolbar.addSeparator()
-        toolbar.addAction(self.line_action)
-        toolbar.addAction(self.rect_action)
+    def _create_menubar (self):
+        for menu in self.menu:
+            q_menu = self.menuBar().addMenu(menu[0])
+            for action in menu[1]:
+                q_action = QAction(action[0], self)
+                q_action.triggered.connect(action[1])
+                q_menu.addAction(q_action)
+
+                if action[2]:
+                    self.toolbar.addAction(q_action)
+
+            self.toolbar.addSeparator()
 
     def open_file(self):
         filename, _ = QFileDialog.getOpenFileName(
@@ -195,6 +191,8 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
+    SHAPES = [Line, Rectangle]
+    
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

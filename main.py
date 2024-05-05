@@ -21,21 +21,21 @@ SHAPES = []
 class Corner(Enum):
     Rounded = 'r'
     Square = 's'
-    
+
     def xml (self):
-        return NotImplementedError()
+        raise NotImplementedError()
 
 # Point and Line classes
 @dataclass
 class Point:
-    x: int
-    y: int
+    x: float = 0.0
+    y: float = 0.0
 
     def __str__(self):
         return ' '.join([v for _, v in asdict(self)])
-    
+
     def xml (self):
-        return NotImplementedError()
+        raise NotImplementedError()
 
 
 @dataclass
@@ -48,8 +48,9 @@ class Colour:
     def __str__(self):
         return ','.join([v for _, v in asdict(self)])
     
+
     def xml (self):
-        return NotImplementedError()
+        raise NotImplementedError()
 
     
 @dataclass
@@ -75,7 +76,7 @@ class Rectangle:
         return ','.join([v for _, v in asdict(self)])
 
     def xml (self):
-        return NotImplementedError()
+        raise NotImplementedError()
 
 
 class DrawingArea(QGraphicsView):
@@ -102,7 +103,7 @@ class MainWindow(QMainWindow):
 
         self.toolbar = self.addToolBar("Drawing")
 
-        # TODO: Can be redone with Named Tuples/Dataclasses?
+        #TODO: Can be redone with Named Tuples/Dataclasses?
         self.menu = [
             ("&File", [
                 ("&Open", self.open_file, True),

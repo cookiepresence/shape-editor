@@ -169,6 +169,28 @@ class Rectangle:
     def contains (self, pos):
         return self._bb.contains(pos)
 
+@dataclass
+class Group:
+    members: list = field(default_factory=list)
+    _bb: BoundingBox = BoundingBox()
+
+    def __str__(self):
+        return '\n'.join(["begin"] + [str(m) for m in self.members] + ["end"])
+
+    def xml (self):
+        raise NotImplementedError()
+
+    def create_group (self, shapes: List):
+        for shape in shapes:
+            self.add_to_group(shape)
+
+    def add_to_group(self, shape):
+        self.members.append(shape)
+        self._bb = self._bb.union(shape._bb)
+
+    def contains (self, pos):
+        return self._bb.contains(pos)
+
 
 class DrawingArea(QGraphicsView):
     def __init__(self):
@@ -182,8 +204,21 @@ class DrawingArea(QGraphicsView):
         self.drawing_line = None
         self.drawing_rect = None  # Initialize drawing_rect to None
 
-    def group_objects (self):
+    def group_objects (self, selection):
+        # TODO: Need to delete elements from the current array, and add to a group that will store everything
         raise NotImplementedError()
+
+    def ungroup_all_objects (self):
+        for obj in self.objects:
+            if isinstance(obj, Group):
+                self.objects.extend(obj.members)
+                obj.members = []
+                obj._bb.in_use = False
+
+    def select_objects(self, pos):
+        pos = Point(pos.x(), pos.y())
+        selected_objs = filter(lambda x: x.contains(pos), self.objects)
+        return selected_objs
 
 
 class MainWindow(QMainWindow):

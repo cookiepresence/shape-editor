@@ -1,6 +1,7 @@
 import sys
 from enum import Enum
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
+from typing import List
 
 from PyQt5.QtWidgets import (
     QApplication,
@@ -47,23 +48,98 @@ class Colour:
 
     def __str__(self):
         return ','.join([v for _, v in asdict(self)])
-    
 
     def xml (self):
         raise NotImplementedError()
 
-    
+
+@dataclass
+class BoundingBox:
+    bottom_left: Point = Point()
+    bottom_right: Point = Point()
+    top_left: Point = Point()
+    top_right: Point = Point()
+
+    in_use: bool = False
+
+    def union (self, bb: BoundingBox):
+        if not bb.in_use :
+            return self
+        elif not self.in_use:
+            return bb
+
+        return BoundingBox(
+            top_left = Point (
+                min(self.top_left.x, bb.top_left.x),
+                min(self.top_left.y, bb.top_left.y)
+            ),
+            bottom_left = Point (
+                min(self.bottom_left.x, bb.bottom_left.x),
+                max(self.bottom_left.y, bb.bottom_left.y)
+            ),
+            bottom_right = Point (
+                max(self.bottom_right.x, bb.bottom_right.x),
+                max(self.bottom_right.y, bb.bottom_right.y)
+            ),
+            top_right = Point (
+                max(self.top_right.x, bb.top_right.x),
+                max(self.top_right.y, bb.top_right.y)
+            ),
+            in_use = True
+        )
+
+    def contains (self, pos: Point):
+        if not self.in_use:
+            return True
+
+        # Since most graphics screens are weird, and y increments from the top
+        return ((self.bottom_left.x <= pos.x < self.top_right.x) and
+                (self.top_left.y <= pos.y < self.bottom_right.y))
+
+    def __add__ (self, bb: BoundingBox):
+        return self.union(bb)
+
+
 @dataclass
 class Line:
     start: Point
     end: Point
     color: Colour
+    _bb: BoundingBox
+
+    def __post_init__(self):
+        self._bb = BoundingBox()
+        self.update_bounding_box()
+
+    def update_bounding_box(self):
+        self._bb.in_use = True
+        self._bb.top_left = Point(min(self.start.x, self.end.x),
+                                 min(self.start.y, self.end.y))
+        self._bb.top_right = Point(max(self.start.x, self.end.x),
+                                 min(self.start.y, self.end.y))
+        self._bb.bottom_left = Point(min(self.start.x, self.end.x),
+                                 max(self.start.y, self.end.y))
+        self._bb.bottom_right = Point(max(self.start.x, self.end.x),
+                                 max(self.start.y, self.end.y))
+
 
     def __str__(self):
-        return ','.join([v for _, v in asdict(self)])
+        return ' '.join([str(v) for k, v in asdict(self).items() if k[0] != '_'])
 
     def xml (self):
-        return NotImplementedError()
+        raise NotImplementedError()
+
+    def contains (self, pos):
+        def dot(v, w):
+            return v.x * w.x + v.y * w.y
+        def cross(v, w):
+            return v.x * w.y + v.y * w.x
+
+        v = Point(pos.x - self.start.x, pos.y - self.start.y)
+        w = Point(self.end.x - pos.x, self.end.y - pos.y)
+
+        return dot(v, w) > 0 and cross(v, w) == 0
+
 
 @dataclass
 class Rectangle:
@@ -71,12 +147,27 @@ class Rectangle:
     lower_right: Point
     color: Colour
     corner: Corner
+    _bb: BoundingBox
+
+    def __post_init__(self):
+        self._bb = BoundingBox()
+        self.update_bounding_box()
+
+    def update_bounding_box(self):
+        self._bb.in_use = True
+        self._bb.top_left = self.upper_left
+        self._bb.top_right = Point(self.lower_right.x, self.upper_left.y)
+        self._bb.bottom_right = self.lower_right
+        self._bb.bottom_left = Point(self.upper_left.x, self.lower_right.y)
 
     def __str__(self):
-        return ','.join([v for _, v in asdict(self)])
+        return ' '.join([v for k, v in asdict(self).items() if k[0] != '_'])
 
     def xml (self):
         raise NotImplementedError()
+
+    def contains (self, pos):
+        return self._bb.contains(pos)
 
 
 class DrawingArea(QGraphicsView):

@@ -11,9 +11,10 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QGraphicsScene,
     QGraphicsView,
+    QGraphicsItem
 )
 from PyQt5.QtGui import QBrush, QPen, QColor, QTransform
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPointF, QRectF
 
 Format = Enum('Format', ['XML', 'DRW'])
 
@@ -105,10 +106,10 @@ class Line:
     start: Point
     end: Point
     color: Colour
-    _bb: BoundingBox
+    _bb: BoundingBox = field(default_factory=BoundingBox)
 
     def __post_init__(self):
-        self._bb = BoundingBox()
+        # self._bb = BoundingBox()
         self.update_bounding_box()
 
     def update_bounding_box(self):
@@ -147,10 +148,10 @@ class Rectangle:
     lower_right: Point
     color: Colour
     corner: Corner
-    _bb: BoundingBox
+    _bb: BoundingBox = field(default_factory=BoundingBox)
 
     def __post_init__(self):
-        self._bb = BoundingBox()
+        # self._bb = BoundingBox()
         self.update_bounding_box()
 
     def update_bounding_box(self):
@@ -191,6 +192,39 @@ class Group:
     def contains (self, pos):
         return self._bb.contains(pos)
 
+class LineItem(QGraphicsItem):
+    def __init__(self, line):
+        super().__init__()
+        self.line = line
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+
+    def boundingRect(self):
+        return QRectF(self.line.start.x, self.line.start.y,
+                      self.line.end.x - self.line.start.x,
+                      self.line.end.y - self.line.start.y)
+
+    def paint(self, painter, option, widget):
+        pen = QPen(QColor(self.line.color.r, self.line.color.g, self.line.color.b))
+        painter.setPen(pen)
+        painter.drawLine(QPointF(self.line.start.x, self.line.start.y),
+                         QPointF(self.line.end.x, self.line.end.y))
+
+
+class RectangleItem(QGraphicsItem):
+    def __init__(self, rect):
+        super().__init__()
+        self.rect = rect
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+
+    def boundingRect(self):
+        return QRectF(self.rect.upper_left.x, self.rect.upper_left.y,
+                      self.rect.lower_right.x - self.rect.upper_left.x,
+                      self.rect.lower_right.y - self.rect.upper_left.y)
+
+    def paint(self, painter, option, widget):
+        pen = QPen(QColor(self.rect.color.r, self.rect.color.g, self.rect.color.b))
+        painter.setPen(pen)
+        painter.drawRect(self.boundingRect())
 
 class DrawingArea(QGraphicsView):
     def __init__(self):
@@ -202,7 +236,42 @@ class DrawingArea(QGraphicsView):
         self.setSceneRect(0, 0, 800, 600)
         self.drawing_object = None
         self.drawing_line = None
-        self.drawing_rect = None  # Initialize drawing_rect to None
+        self.drawing_rect = None
+
+    def mousePressEvent(self, event):
+        if self.drawing_object == Line:
+            self.drawing_line = Line(Point(event.x(), event.y()), Point(event.x(), event.y()),
+                                     Colour(0, 0, 0, 0))
+        elif self.drawing_object == Rectangle:
+            self.drawing_rect = Rectangle(Point(event.x(), event.y()), Point(event.x(), event.y()),
+                                          Colour(0, 0, 0, 0), Corner.Square)
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.drawing_line:
+            self.drawing_line.end = Point(event.x(), event.y())
+            self.scene.clear()
+            self.scene.addItem(LineItem(self.drawing_line))
+        elif self.drawing_rect:
+            self.drawing_rect.lower_right = Point(event.x(), event.y())
+            self.scene.clear()
+            self.scene.addItem(RectangleItem(self.drawing_rect))
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self.drawing_line:
+            self.objects.append(self.drawing_line)
+            self.drawing_line = None
+        elif self.drawing_rect:
+            self.objects.append(self.drawing_rect)
+            self.drawing_rect = None
+        else:
+            super().mouseReleaseEvent(event)
+
+    def set_drawing_object(self, obj_type):
+        self.drawing_object = obj_type
 
     def group_objects (self, selection):
         # TODO: Need to delete elements from the current array, and add to a group that will store everything

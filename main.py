@@ -237,6 +237,8 @@ class DrawingArea(QGraphicsView):
         self.drawing_object = None
         self.drawing_line = None
         self.drawing_rect = None
+        self.drawing_line_item = None
+        self.drawing_rect_item = None
 
     def mousePressEvent(self, event):
         if self.drawing_object == Line:
@@ -251,12 +253,22 @@ class DrawingArea(QGraphicsView):
     def mouseMoveEvent(self, event):
         if self.drawing_line:
             self.drawing_line.end = Point(event.x(), event.y())
-            self.scene.clear()
-            self.scene.addItem(LineItem(self.drawing_line))
+            if not self.drawing_line_item:
+                self.drawing_line_item = LineItem(self.drawing_line)
+                self.scene.addItem(self.drawing_line_item)
+            else:
+                self.drawing_line_item.prepareGeometryChange()
+                self.drawing_line_item.line = self.drawing_line
+                self.drawing_line_item.update()
         elif self.drawing_rect:
             self.drawing_rect.lower_right = Point(event.x(), event.y())
-            self.scene.clear()
-            self.scene.addItem(RectangleItem(self.drawing_rect))
+            if not self.drawing_rect_item:
+                self.drawing_rect_item = RectangleItem(self.drawing_rect)
+                self.scene.addItem(self.drawing_rect_item)
+            else:
+                self.drawing_rect_item.prepareGeometryChange()
+                self.drawing_rect_item.rect = self.drawing_rect
+                self.drawing_rect_item.update()
         else:
             super().mouseMoveEvent(event)
 
@@ -264,9 +276,11 @@ class DrawingArea(QGraphicsView):
         if self.drawing_line:
             self.objects.append(self.drawing_line)
             self.drawing_line = None
+            self.drawing_line_item = None
         elif self.drawing_rect:
             self.objects.append(self.drawing_rect)
             self.drawing_rect = None
+            self.drawing_rect_item = None
         else:
             super().mouseReleaseEvent(event)
 

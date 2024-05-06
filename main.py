@@ -337,6 +337,18 @@ class DrawingArea(QGraphicsView):
         self.copied_item = None
         self.edit_mode = False
 
+    def display_objects(self, objects):
+        self.objects = objects
+        self.scene.clear()
+        for obj in self.objects:
+            if isinstance(obj, Line):
+                item = LineItem(obj)
+            elif isinstance(obj, Rectangle):
+                item = RectangleItem(obj)
+            else:
+                continue
+            self.scene.addItem(item)
+
     def toggle_copy_mode(self):
         self.copy_mode = not self.copy_mode
         if not self.copy_mode:
@@ -621,7 +633,8 @@ class MainWindow(QMainWindow):
                 with open(filename, "r") as f:
                     file_contents = f.read()
 
-                print(self.parse_file(Format.DRW, file_contents))
+                objects = self.parse_file(Format.DRW, file_contents)
+                self.drawing_area.display_objects(objects)
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
 
@@ -644,15 +657,15 @@ class MainWindow(QMainWindow):
             def parse_line(line):
                 tokens = line.split()
                 if tokens[0] == "line":
-                    start = Point(tokens[1], tokens[2])
-                    end = Point(tokens[3], tokens[4])
+                    start = Point(float(tokens[1]), float(tokens[2]))
+                    end = Point(float(tokens[3]), float(tokens[4]))
                     colour = Colour(*map(int, tokens[5].split(',')))
                     return Line(start, end, colour)
                 elif tokens[0] == "rect":
-                    upper_left = Point(tokens[1], tokens[2])
-                    bottom_right = Point(tokens[3], tokens[4])
+                    upper_left = Point(float(tokens[1]), float(tokens[2]))
+                    bottom_right = Point(float(tokens[3]), float(tokens[4]))
                     colour = Colour(*map(int, tokens[5].split(',')))
-                    corner = Corner(tokens[6]) if len(tokens) > 6 else None
+                    corner = Corner(tokens[6]) if len(tokens) > 6 else Corner.Square
                     return Rectangle(upper_left, bottom_right, colour, corner)
 
             def parse_group(lines):

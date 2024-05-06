@@ -16,6 +16,68 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QBrush, QPen, QColor, QTransform
 from PyQt5.QtCore import Qt, QPointF, QRectF
 
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QComboBox, QPushButton
+class ObjectDialog(QDialog):
+    def __init__(self, obj):
+        super().__init__()
+        self.obj = obj
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout()
+
+        if isinstance(self.obj, Line):
+            color_label = QLabel("Line Color:")
+            self.color_combo = QComboBox()
+            self.color_combo.addItems(["black", "red", "green", "blue"])
+            current_color = self.get_color_name(self.obj.color)
+            self.color_combo.setCurrentText(current_color)
+            layout.addWidget(color_label)
+            layout.addWidget(self.color_combo)
+        elif isinstance(self.obj, Rectangle):
+            color_label = QLabel("Rectangle Color:")
+            self.color_combo = QComboBox()
+            self.color_combo.addItems(["black", "red", "green", "blue"])
+            current_color = self.get_color_name(self.obj.color)
+            self.color_combo.setCurrentText(current_color)
+            layout.addWidget(color_label)
+            layout.addWidget(self.color_combo)
+
+            corner_label = QLabel("Corner Style:")
+            self.corner_combo = QComboBox()
+            self.corner_combo.addItems(["square", "rounded"])
+            self.corner_combo.setCurrentText(self.obj.corner.name.lower())
+            layout.addWidget(corner_label)
+            layout.addWidget(self.corner_combo)
+
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(self.accept)
+        layout.addWidget(ok_button)
+
+        self.setLayout(layout)
+        self.setWindowTitle("Edit Object")
+
+    def get_color_name(self, color):
+        if color.k == 0 and color.r == 0 and color.g == 0 and color.b == 0:
+            return "black"
+        elif color.k == 0 and color.r > 0 and color.g == 0 and color.b == 0:
+            return "red"
+        elif color.k == 0 and color.r == 0 and color.g > 0 and color.b == 0:
+            return "green"
+        elif color.k == 0 and color.r == 0 and color.g == 0 and color.b > 0:
+            return "blue"
+        else:
+            return "black"  # Default color if no match is found
+    def get_properties(self):
+        if isinstance(self.obj, Line):
+            color = self.color_combo.currentText()
+            return {"color": color}
+        elif isinstance(self.obj, Rectangle):
+            color = self.color_combo.currentText()
+            corner = self.corner_combo.currentText()
+            return {"color": color, "corner": corner}
+
+
 Format = Enum('Format', ['XML', 'DRW'])
 
 SHAPES = []
@@ -229,7 +291,10 @@ class RectangleItem(QGraphicsItem):
     def paint(self, painter, option, widget):
         pen = QPen(QColor(self.rect.color.r, self.rect.color.g, self.rect.color.b))
         painter.setPen(pen)
-        painter.drawRect(self.boundingRect())
+        if self.rect.corner == Corner.Rounded:
+            painter.drawRoundedRect(self.boundingRect(), 10, 10)
+        else:
+            painter.drawRect(self.boundingRect())
 
     def itemChange(self, change, value):
             if change == QGraphicsItem.ItemSelectedChange:
@@ -255,6 +320,7 @@ class DrawingArea(QGraphicsView):
         self.delete_mode = False
         self.copy_mode = False
         self.copied_item = None
+        self.edit_mode = False
 
     def toggle_copy_mode(self):
         self.copy_mode = not self.copy_mode
@@ -300,6 +366,37 @@ class DrawingArea(QGraphicsView):
     #         self.scene.removeItem(item)
     #     self.selected_items = []
 
+    def edit_item(self, item):
+        if isinstance(item, LineItem):
+            obj = item.line
+        elif isinstance(item, RectangleItem):
+            obj = item.rect
+        else:
+            return
+
+        dialog = ObjectDialog(obj)
+        if dialog.exec_() == QDialog.Accepted:
+            properties = dialog.get_properties()
+            if isinstance(obj, Line):
+                obj.color = self.get_color_from_name(properties["color"])
+                item.update()
+            elif isinstance(obj, Rectangle):
+                obj.color = self.get_color_from_name(properties["color"])
+                obj.corner = getattr(Corner, properties["corner"].capitalize())
+                item.update()
+
+    def get_color_from_name(self, color_name):
+        if color_name == "black":
+            return Colour(0, 0, 0, 0)
+        elif color_name == "red":
+            return Colour(0, 255, 0, 0)
+        elif color_name == "green":
+            return Colour(0, 0, 255, 0)
+        elif color_name == "blue":
+            return Colour(0, 0, 0, 255)
+        else:
+            return Colour(0, 0, 0, 0) 
+
     def toggle_move_mode(self):
         self.move_mode = not self.move_mode
         if self.move_mode:
@@ -326,6 +423,13 @@ class DrawingArea(QGraphicsView):
             self.scene.addItem(new_item)
 
     def mousePressEvent(self, event):
+        if self.edit_mode:
+            item = self.itemAt(event.pos())
+            if item:
+                self.edit_item(item)
+                event.accept()
+            else:
+                event.ignore()
         if self.copy_mode:
             item = self.itemAt(event.pos())
             if item:
@@ -454,11 +558,15 @@ class MainWindow(QMainWindow):
             ("&Edit", [
                 ("&Group", self.drawing_area.group_objects, False),
                 ("&Move", self.toggle_move_mode, True),
-                ("&Delete", self.toggle_delete_mode, True)
+                ("&Delete", self.toggle_delete_mode, True),
+                ("&Edit", self.toggle_edit_mode, True)
             ])
         ]
 
         self._create_menubar()
+
+    def toggle_edit_mode(self):
+        self.drawing_area.edit_mode = not self.drawing_area.edit_mode
 
     def toggle_copy_mode(self):
         self.drawing_area.toggle_copy_mode()

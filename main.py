@@ -172,7 +172,7 @@ class Rectangle:
 @dataclass
 class Group:
     members: list = field(default_factory=list)
-    _bb: BoundingBox = BoundingBox()
+    _bb: BoundingBox =field(default_factory=BoundingBox)
 
     def __str__(self):
         return '\n'.join(["begin"] + [str(m) for m in self.members] + ["end"])

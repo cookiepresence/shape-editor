@@ -268,6 +268,7 @@ class DrawingArea(QGraphicsView):
                 self.moving_item = item
             else:
                 self.setDragMode(QGraphicsView.RubberBandDrag)
+                self.moving_item = None
                 super().mousePressEvent(event)
         else:
             if self.drawing_object == Line:
@@ -280,10 +281,19 @@ class DrawingArea(QGraphicsView):
                 super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self.move_mode and self.moving_item:
-            delta = event.pos() - self.start_pos
-            self.moving_item.setPos(self.moving_item.pos() + delta)
-            self.start_pos = event.pos()
+        if self.move_mode:
+            if self.moving_item:
+                delta = event.pos() - self.start_pos
+                self.moving_item.setPos(self.moving_item.pos() + delta)
+                self.start_pos = event.pos()
+            else:
+                item = self.itemAt(event.pos())
+                if item:
+                    self.setDragMode(QGraphicsView.NoDrag)
+                    self.start_pos = event.pos()
+                    self.moving_item = item
+                else:
+                    super().mouseMoveEvent(event)
         elif self.drawing_line:
             self.drawing_line.end = Point(event.x(), event.y())
             if not self.drawing_line_item:
@@ -309,6 +319,7 @@ class DrawingArea(QGraphicsView):
         if self.move_mode:
             self.setDragMode(QGraphicsView.RubberBandDrag)
             self.moving_item = None
+            super().mouseReleaseEvent(event)
         elif self.drawing_line:
             self.objects.append(self.drawing_line)
             self.drawing_line = None

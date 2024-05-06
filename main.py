@@ -336,6 +336,10 @@ class DrawingArea(QGraphicsView):
         self.copy_mode = False
         self.copied_item = None
         self.edit_mode = False
+        self.group_mode = False
+
+    def toggle_group_mode(self):
+        self.group_mode = not self.group_mode
 
     def display_objects(self, objects):
         self.objects = objects
@@ -454,14 +458,25 @@ class DrawingArea(QGraphicsView):
                 pass
 
     def mousePressEvent(self, event):
-        if self.edit_mode:
+        if self.group_mode:
+            item = self.itemAt(event.pos())
+            if item:
+                if event.modifiers() & Qt.ControlModifier:
+                    item.setSelected(not item.isSelected())
+                else:
+                    self.scene.clearSelection()
+                    item.setSelected(True)
+            else:
+                self.scene.clearSelection()
+            event.accept()
+        elif self.edit_mode:
             item = self.itemAt(event.pos())
             if item:
                 self.edit_item(item)
                 event.accept()
             else:
                 event.ignore()
-        if self.copy_mode:
+        elif self.copy_mode:
             item = self.itemAt(event.pos())
             if item:
                 self.copied_item = item
@@ -495,7 +510,7 @@ class DrawingArea(QGraphicsView):
                                             Colour(0, 0, 0, 0), Corner.Square)
             else:
                 super().mousePressEvent(event)
-
+                
     def mouseMoveEvent(self, event):
         if self.move_mode:
             if self.moving_item:
@@ -550,10 +565,20 @@ class DrawingArea(QGraphicsView):
     def set_drawing_object(self, obj_type):
         self.drawing_object = obj_type
 
-    def group_objects (self, selection):
-        print(self.selected_objects)
-        # TODO: Need to delete elements from the current array, and add to a group that will store everything
-        raise NotImplementedError()
+    def group_objects(self):
+        selected_items = self.scene.selectedItems()
+        if len(selected_items) > 1:
+            group = Group()
+            for item in selected_items:
+                if isinstance(item, LineItem):
+                    group.add_to_group(item.line)
+                    self.objects.remove(item.line)
+                elif isinstance(item, RectangleItem):
+                    group.add_to_group(item.rect)
+                    self.objects.remove(item.rect)
+                self.scene.removeItem(item)
+            self.objects.append(group)
+            self.display_group(group)
 
     def ungroup_all_objects (self):
         for obj in self.objects:
@@ -582,6 +607,7 @@ class MainWindow(QMainWindow):
             ("&File", [
                 ("&Open", self.open_file, True),
                 ("&Save", self.save_file, True),
+                ("&Export to XML", self.export_to_xml, True),
                 ("&Copy", self.toggle_copy_mode, True)
             ]),
             ("&Draw", [
@@ -597,6 +623,17 @@ class MainWindow(QMainWindow):
         ]
 
         self._create_menubar()
+
+    def export_to_xml(self):
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Export to XML", "", "XML Files (*.xml)"
+        )
+        if filename:
+            try:
+                with open(filename, "w") as f:
+                    f.write(self.drawing_to_string(Format.XML))
+            except Exception as e:
+                QMessageBox.critical(self, "Error", str(e))
 
     def toggle_edit_mode(self):
         self.drawing_area.edit_mode = not self.drawing_area.edit_mode
@@ -698,7 +735,16 @@ class MainWindow(QMainWindow):
             case Format.DRW:
                 return '\n'.join([str(obj) for obj in self.drawing_area.objects])
             case Format.XML:
-                return '\n'.join([obj.xml() for obj in self.drawing_area.objects])
+                xml_lines = []
+                for obj in self.drawing_area.objects:
+                    if isinstance(obj, Group):
+                        xml_lines.append("<group>")
+                        for member in obj.members:
+                            xml_lines.append(member.xml())
+                        xml_lines.append("</group>")
+                    else:
+                        xml_lines.append(obj.xml())
+                return '\n'.join(xml_lines)
 
 
 if __name__ == "__main__":

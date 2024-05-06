@@ -208,6 +208,11 @@ class LineItem(QGraphicsItem):
         painter.setPen(pen)
         painter.drawLine(QPointF(self.line.start.x, self.line.start.y),
                          QPointF(self.line.end.x, self.line.end.y))
+        
+    def itemChange(self, change, value):
+            if change == QGraphicsItem.ItemSelectedChange:
+                self.setSelected(value)
+            return super().itemChange(change, value)
 
 
 class RectangleItem(QGraphicsItem):
@@ -226,6 +231,11 @@ class RectangleItem(QGraphicsItem):
         painter.setPen(pen)
         painter.drawRect(self.boundingRect())
 
+    def itemChange(self, change, value):
+            if change == QGraphicsItem.ItemSelectedChange:
+                self.setSelected(value)
+            return super().itemChange(change, value)
+
 class DrawingArea(QGraphicsView):
     def __init__(self):
         super().__init__()
@@ -239,19 +249,42 @@ class DrawingArea(QGraphicsView):
         self.drawing_rect = None
         self.drawing_line_item = None
         self.drawing_rect_item = None
+        self.move_mode = False
+        self.moving_item = None
+
+    def toggle_move_mode(self):
+        self.move_mode = not self.move_mode
+        if self.move_mode:
+            self.setDragMode(QGraphicsView.RubberBandDrag)
+        else:
+            self.setDragMode(QGraphicsView.NoDrag)
 
     def mousePressEvent(self, event):
-        if self.drawing_object == Line:
-            self.drawing_line = Line(Point(event.x(), event.y()), Point(event.x(), event.y()),
-                                     Colour(0, 0, 0, 0))
-        elif self.drawing_object == Rectangle:
-            self.drawing_rect = Rectangle(Point(event.x(), event.y()), Point(event.x(), event.y()),
-                                          Colour(0, 0, 0, 0), Corner.Square)
+        if self.move_mode:
+            item = self.itemAt(event.pos())
+            if item:
+                self.setDragMode(QGraphicsView.NoDrag)
+                self.start_pos = event.pos()
+                self.moving_item = item
+            else:
+                self.setDragMode(QGraphicsView.RubberBandDrag)
+                super().mousePressEvent(event)
         else:
-            super().mousePressEvent(event)
+            if self.drawing_object == Line:
+                self.drawing_line = Line(Point(event.x(), event.y()), Point(event.x(), event.y()),
+                                        Colour(0, 0, 0, 0))
+            elif self.drawing_object == Rectangle:
+                self.drawing_rect = Rectangle(Point(event.x(), event.y()), Point(event.x(), event.y()),
+                                            Colour(0, 0, 0, 0), Corner.Square)
+            else:
+                super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self.drawing_line:
+        if self.move_mode and self.moving_item:
+            delta = event.pos() - self.start_pos
+            self.moving_item.setPos(self.moving_item.pos() + delta)
+            self.start_pos = event.pos()
+        elif self.drawing_line:
             self.drawing_line.end = Point(event.x(), event.y())
             if not self.drawing_line_item:
                 self.drawing_line_item = LineItem(self.drawing_line)
@@ -273,7 +306,10 @@ class DrawingArea(QGraphicsView):
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if self.drawing_line:
+        if self.move_mode:
+            self.setDragMode(QGraphicsView.RubberBandDrag)
+            self.moving_item = None
+        elif self.drawing_line:
             self.objects.append(self.drawing_line)
             self.drawing_line = None
             self.drawing_line_item = None
@@ -323,11 +359,15 @@ class MainWindow(QMainWindow):
                 ("&Rect", lambda: self.drawing_area.set_drawing_object(Rectangle), True)
             ]),
             ("&Edit", [
-                ("&Group", self.drawing_area.group_objects, False)
+                ("&Group", self.drawing_area.group_objects, False),
+                ("&Move", self.toggle_move_mode, True)
             ])
         ]
 
         self._create_menubar()
+
+    def toggle_move_mode(self):
+        self.drawing_area.toggle_move_mode()
 
     def _create_menubar (self):
         for menu in self.menu:

@@ -87,7 +87,7 @@ class Corner(Enum):
     Square = 's'
 
     def xml (self):
-        raise NotImplementedError()
+        return f'<corner>{self.value}</corner>'
 
 # Point and Line classes
 @dataclass
@@ -99,7 +99,7 @@ class Point:
         return ' '.join([v for _, v in asdict(self)])
 
     def xml (self):
-        raise NotImplementedError()
+        return f'<x>{self.x}</x><y>{self.y}</y>'
 
 
 @dataclass
@@ -113,7 +113,7 @@ class Colour:
         return ','.join([v for _, v in asdict(self)])
 
     def xml (self):
-        raise NotImplementedError()
+        return f'<k>{self.k}</k><r>{self.r}</r><g>{self.g}</g><b>{self.b}</b>'
 
 
 @dataclass
@@ -190,7 +190,7 @@ class Line:
         return ' '.join([str(v) for k, v in asdict(self).items() if k[0] != '_'])
 
     def xml (self):
-        raise NotImplementedError()
+        return f'<line><begin>{self.start.xml()}</begin><end>{self.end.xml()}</end><color>{self.color.xml()}</color></line>'
 
     def contains (self, pos):
         def dot(v, w):
@@ -227,7 +227,7 @@ class Rectangle:
         return ' '.join([v for k, v in asdict(self).items() if k[0] != '_'])
 
     def xml (self):
-        raise NotImplementedError()
+        return f'<rectangle><upper-left>{self.upper_left.xml()}</upper-left><lower-right>{self.lower_right.xml()}</lower-right><color>{self.color.xml()}</color>{self.corner.xml()}</rectangle>'
 
     def contains (self, pos):
         return self._bb.contains(pos)
@@ -241,7 +241,7 @@ class Group:
         return '\n'.join(["begin"] + [str(m) for m in self.members] + ["end"])
 
     def xml (self):
-        raise NotImplementedError()
+        return f'<group>{"".join([m.xml() for m in self.members])}</group>'
 
     def create_group (self, shapes: List):
         for shape in shapes:

@@ -251,6 +251,47 @@ class DrawingArea(QGraphicsView):
         self.drawing_rect_item = None
         self.move_mode = False
         self.moving_item = None
+        self.selected_items = []
+        self.delete_mode = False
+
+    # def delete_item(self, item):
+    #     if isinstance(item, Group):
+    #         self.objects.remove(item)
+    #     else:
+    #         for obj in self.objects:
+    #             if isinstance(obj, Group) and item in obj.members:
+    #                 obj.members.remove(item)
+    #                 break
+    #         else:
+    #             self.objects.remove(item)
+    #     self.scene.removeItem(item)
+
+    def delete_item(self, item):
+        for obj in self.objects:
+            if isinstance(obj, Line) and isinstance(item, LineItem) and obj == item.line:
+                self.objects.remove(obj)
+                break
+            elif isinstance(obj, Rectangle) and isinstance(item, RectangleItem) and obj == item.rect:
+                self.objects.remove(obj)
+                break
+        self.scene.removeItem(item)
+
+    def toggle_delete_mode(self):
+        self.delete_mode = not self.delete_mode
+
+    # def delete_selected_objects(self):
+    #     for item in self.selected_items:
+    #         if isinstance(item, Group):
+    #             self.objects.remove(item)
+    #         else:
+    #             for obj in self.objects:
+    #                 if isinstance(obj, Group) and item in obj.members:
+    #                     obj.members.remove(item)
+    #                     break
+    #             else:
+    #                 self.objects.remove(item)
+    #         self.scene.removeItem(item)
+    #     self.selected_items = []
 
     def toggle_move_mode(self):
         self.move_mode = not self.move_mode
@@ -260,7 +301,14 @@ class DrawingArea(QGraphicsView):
             self.setDragMode(QGraphicsView.NoDrag)
 
     def mousePressEvent(self, event):
-        if self.move_mode:
+        if self.delete_mode:
+            item = self.itemAt(event.pos())
+            if item:
+                self.delete_item(item)
+                event.accept()
+            else:
+                event.ignore()
+        elif self.move_mode:
             item = self.itemAt(event.pos())
             if item:
                 self.setDragMode(QGraphicsView.NoDrag)
@@ -371,11 +419,15 @@ class MainWindow(QMainWindow):
             ]),
             ("&Edit", [
                 ("&Group", self.drawing_area.group_objects, False),
-                ("&Move", self.toggle_move_mode, True)
+                ("&Move", self.toggle_move_mode, True),
+                ("&Delete", self.toggle_delete_mode, True)
             ])
         ]
 
         self._create_menubar()
+
+    def toggle_delete_mode(self):
+        self.drawing_area.toggle_delete_mode()
 
     def toggle_move_mode(self):
         self.drawing_area.toggle_move_mode()

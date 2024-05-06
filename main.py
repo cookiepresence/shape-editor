@@ -62,8 +62,8 @@ class BoundingBox:
 
     in_use: bool = False
 
-    def union (self, bb: BoundingBox):
-        if not bb.in_use :
+    def union (self, bb):
+        if not bb.in_use:
             return self
         elif not self.in_use:
             return bb
@@ -96,7 +96,7 @@ class BoundingBox:
         return ((self.bottom_left.x <= pos.x < self.top_right.x) and
                 (self.top_left.y <= pos.y < self.bottom_right.y))
 
-    def __add__ (self, bb: BoundingBox):
+    def __add__ (self, bb):
         return self.union(bb)
 
 

@@ -55,10 +55,10 @@ class Colour:
 
 @dataclass
 class BoundingBox:
-    bottom_left: Point = Point()
-    bottom_right: Point = Point()
-    top_left: Point = Point()
-    top_right: Point = Point()
+    bottom_left: Point = field(default_factory=Point)
+    bottom_right: Point = field(default_factory=Point)
+    top_left: Point = field(default_factory=Point)
+    top_right: Point = field(default_factory=Point)
 
     in_use: bool = False
 

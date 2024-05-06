@@ -253,6 +253,13 @@ class DrawingArea(QGraphicsView):
         self.moving_item = None
         self.selected_items = []
         self.delete_mode = False
+        self.copy_mode = False
+        self.copied_item = None
+
+    def toggle_copy_mode(self):
+        self.copy_mode = not self.copy_mode
+        if not self.copy_mode:
+            self.copied_item = None
 
     # def delete_item(self, item):
     #     if isinstance(item, Group):
@@ -300,8 +307,34 @@ class DrawingArea(QGraphicsView):
         else:
             self.setDragMode(QGraphicsView.NoDrag)
 
+    def paste_item(self, pos):
+        if self.copied_item:
+            if isinstance(self.copied_item, LineItem):
+                line = self.copied_item.line
+                new_line = Line(Point(line.start.x + pos.x(), line.start.y + pos.y()),
+                                Point(line.end.x + pos.x(), line.end.y + pos.y()),
+                                line.color)
+                new_item = LineItem(new_line)
+                self.objects.append(new_line)
+            elif isinstance(self.copied_item, RectangleItem):
+                rect = self.copied_item.rect
+                new_rect = Rectangle(Point(rect.upper_left.x + pos.x(), rect.upper_left.y + pos.y()),
+                                    Point(rect.lower_right.x + pos.x(), rect.lower_right.y + pos.y()),
+                                    rect.color, rect.corner)
+                new_item = RectangleItem(new_rect)
+                self.objects.append(new_rect)
+            self.scene.addItem(new_item)
+
     def mousePressEvent(self, event):
-        if self.delete_mode:
+        if self.copy_mode:
+            item = self.itemAt(event.pos())
+            if item:
+                self.copied_item = item
+                event.accept()
+            else:
+                self.paste_item(event.pos())
+                event.accept()
+        elif self.delete_mode:
             item = self.itemAt(event.pos())
             if item:
                 self.delete_item(item)
@@ -411,7 +444,8 @@ class MainWindow(QMainWindow):
         self.menu = [
             ("&File", [
                 ("&Open", self.open_file, True),
-                ("&Save", self.save_file, True)
+                ("&Save", self.save_file, True),
+                ("&Copy", self.toggle_copy_mode, True)
             ]),
             ("&Draw", [
                 ("&Line", lambda: self.drawing_area.set_drawing_object(Line), True),
@@ -425,6 +459,9 @@ class MainWindow(QMainWindow):
         ]
 
         self._create_menubar()
+
+    def toggle_copy_mode(self):
+        self.drawing_area.toggle_copy_mode()
 
     def toggle_delete_mode(self):
         self.drawing_area.toggle_delete_mode()
